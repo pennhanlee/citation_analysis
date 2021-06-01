@@ -7,6 +7,8 @@ import math
 
 import lib.pdfscrap as pdfscrap
 import lib.analysis as analysis
+import lib.textminer as textminer
+import lib.wordcloudcreator as wordcloudcreator
 
 #Temporary URl Hardcode
 CLUSTER_FILEPATH = "./data/cluster/vosviewer_graph_1_500.csv"
@@ -69,11 +71,9 @@ def prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df):
     df['ISSN'] = df["ISSN"].replace("-", "", regex=True)
     df['eISSN'] = df["eISSN"].replace("-", "", regex=True)
 
-
-    # for index, row in df.iterrows():
-    #     journal_issn = row["ISSN"]
-    #     journal_eissn = row["eISSN"]
-    #     df = pd.merge(df, journal_df[["CiteScore", "SNIP", "SJR"]], how="left", left_on = ["ISSN"], right_on = ["Print ISSN"])
+    # issn_version = journal_df.dropna(subset=['Print ISSN']).drop_duplicates(subset=["Scopus Source ID"])
+    # print(issn_version.columns)
+    # df = df.merge(issn_version[["CiteScore", "Print ISSN"]], how="left", left_on = ["ISSN"], right_on = ["Print ISSN"])
 
     df["Cluster"] = cluster_df["cluster"]
     df["Normalised Bib Coupling Weight"] = cluster_df["weight<Norm. citations>"]
@@ -90,12 +90,15 @@ def get_frontier_type(frontier):
         if (published_year >= current_year - 3):
             recently_emerging_counter = recently_emerging_counter + 1
     frontier_type = None
-    if ((recently_emerging_counter/len(frontier) * 100) >= 80):
-        frontier_type = "Recently Emerging Frontier"
-    elif (len(persistent_emerging_counter) > (YEAR_RANGE/2)):  #Currently hardcoded for 10 years
-        frontier_type = "Persistently Emerging Frontier"
+    if (len(frontier) < 0):
+        frontier_type = "Outlier"
     else:
-        frontier_type = "Neutral Frontier"
+        if ((recently_emerging_counter/len(frontier) * 100) >= 80):
+            frontier_type = "Recently Emerging Frontier"
+        elif (len(persistent_emerging_counter) > (YEAR_RANGE/2)):  #Currently hardcoded for 10 years
+            frontier_type = "Persistently Emerging Frontier"
+        else:
+            frontier_type = "Neutral Frontier"
     
     return frontier_type
 
@@ -106,9 +109,6 @@ def get_frontier_stats(frontier, total_doc, max_year, min_year):
     impact = analysis.impact_index(total_no_of_citation, total_no_of_entries)
     # sci_based = analysis.sci_based_index()
     return growth, impact
-
-def get_frontier_name(frontier):
-    return None
 
 def extract_frontier(cleaned_df):
     number_of_cluster = int(cleaned_df["Cluster"].max() + 1)
@@ -121,8 +121,8 @@ def extract_frontier(cleaned_df):
             frontier_index = int(number_of_cluster)
         #Title, Year, Keyword, TimesCited, TimesCiting -> to add Journal and Abstract
         publication = [row["Article Title"], row["Publication Year"], 
-                        row["Keywords"], row["Cited Reference Count"], 
-                        row["Times Cited, WoS Core"]]
+                        row["Abstract"], row["Keywords"], 
+                        row["Cited Reference Count"], row["Times Cited, WoS Core"]]
         frontier_list[int(frontier_index - 1)].append(publication)
     
     return frontier_list
@@ -130,18 +130,21 @@ def extract_frontier(cleaned_df):
 
 def create_individual_frontier_df(frontier_list):
     frontier_count = 1
-    current_time = "today"
+    current_time_str = datetime.datetime.now().strftime("%d-%m-%Y-%H%M")
     frontier_df_list = []
-    if not os.path.exists("./data/cluster/" + str(current_time)):
-            os.makedirs("./data/cluster/" + str(current_time))
     for frontier in frontier_list:
-        current_frontier_df = pd.DataFrame(frontier, columns = ['Title', 'Year', 'Keywords', 'Citing Others', 
+        current_frontier_df = pd.DataFrame(frontier, columns = ['Title', 'Year', 'Abstract', 'Keywords', 'Citing Others', 
         'Cited by Others'])
+        frontier_words = textminer.mine_paper_info(current_frontier_df)
+        frontier_name = textminer.mine_frontier_name(frontier_words)
         frontier_df_list.append(current_frontier_df)
-        path = "./data/cluster/{}/{}.xlsx".format(current_time ,frontier_count)
-        current_frontier_df.to_excel(path, index=False)
+        if not os.path.exists("./data/cluster/" + current_time_str + "/" + frontier_name):
+            os.makedirs("./data/cluster/" + current_time_str + "/" + frontier_name)
+        excel_path = "./data/cluster/{}/{}/{}.xlsx".format(current_time_str, frontier_name, frontier_name)
+        wordcloud_path = "./data/cluster/{}/{}/wordcloud.png".format(current_time_str, frontier_name)
+        current_frontier_df.to_excel(excel_path, index=False)
+        wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
         frontier_count = frontier_count + 1
-
     return frontier_df_list
 
 def create_frontier_summary_df(frontier_df_list, total_doc, max_year, min_year):
@@ -149,14 +152,14 @@ def create_frontier_summary_df(frontier_df_list, total_doc, max_year, min_year):
     count = 1
     for frontier in frontier_df_list:
         current_frontier = []
-        frontier_name = get_frontier_name(frontier)
+        frontier_name = "HARDCODED NAME FOR NOW, SUPPOSE TO RETRIEVE FROM A DICT OR TUPLE DIRECTLY FROM FRONTIER"
         frontier_type = get_frontier_type(frontier)
         frontier_size = len(frontier.index)
-        print("NEXT FRONTIER: " + str(count))
+        # print("NEXT FRONTIER: " + str(count))
         count = count + 1
         frontier_growth, frontier_impact = get_frontier_stats(frontier, total_doc, max_year, min_year)
-        print("\nFrontier Growth: " + str(frontier_growth))
-        print("Frontier Impact: " + str(frontier_impact) + "\n")
+        # print("\nFrontier Growth: " + str(frontier_growth))
+        # print("Frontier Impact: " + str(frontier_impact) + "\n")
         current_frontier = [frontier_name, frontier_type, frontier_size, 
                             frontier_growth, frontier_impact]
         frontier_summary.append(current_frontier)
@@ -171,10 +174,10 @@ def main():
     fullrecord_path = input("Please provide fullrecord excel filepath \n")
     cluster_df = pd.read_csv(CLUSTER_FILEPATH)
     fullrecord_df = pd.read_excel(FULLRECORD_FILEPATH)
-    #journal_df = pd.read_excel(JOURNAL_FILEPATH, sheet_name=JOURNAL_SHEETNAME, engine='pyxlsb')
-    journal_df = pd.read_excel(FULLRECORD_FILEPATH) #Temporary, the loading of journal takes too long for testing
+    # journal_df = pd.read_excel(JOURNAL_FILEPATH, sheet_name=JOURNAL_SHEETNAME, engine='pyxlsb')
+    journal_df = pd.read_excel(FULLRECORD_FILEPATH) # Temporary, the loading of journal takes too long for testing
     cleaned_fullrecord_df = prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df)
-    cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
+    # cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
     max_year = MAX_YEAR
     min_year = max_year - YEAR_RANGE
     total_doc = len(cleaned_fullrecord_df.index)
