@@ -4,11 +4,13 @@ import os
 import datetime
 import time
 import math
+import shutil
 
 import lib.pdfscrap as pdfscrap
 import lib.analysis as analysis
 import lib.textminer as textminer
 import lib.wordcloudcreator as wordcloudcreator
+import lib.researchfrontier as researchfrontier
 
 #Temporary URl Hardcode
 CLUSTER_FILEPATH = "./data/cluster/vosviewer_graph_1_500.csv"
@@ -17,36 +19,17 @@ JOURNAL_FILEPATH = "./data/cluster/CiteScore_2011_2019.xlsb"
 JOURNAL_SHEETNAME = "CiteScore 2019"
 MAX_YEAR = 2021
 YEAR_RANGE = 10
-
+CURRENT_TIME_STRING = ""
 
 def pdf_scrap_handler():
     pdfscrap.citationExtractor()
-
-def heat_map_handler():
-    print("Feature Coming Soon")
 
 def error(user_input):
     print("Did not understand your input: " + user_input)
     return None
 
-
 def pdf_extraction():
-    try:
-        while True:
-            print("Citation Analysis Programme \nPress 'Ctrl C' to quit this program \n")
-            user_input = input("Please select an option: \n1. Load new PDF file \n2. Generate Heat Map \n")
-            if user_input == "1":
-                pdf_scrap_handler()
-            elif user_input == "2":
-                heat_map_handler()
-            else:
-                error(user_input)
-
-    except KeyboardInterrupt:
-        print("Terminating Citation Analysis Programme")
-        time.sleep(2)
-        pass
-    
+    pdf_scrap_handler()
     return None
 
 def prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df):
@@ -80,95 +63,6 @@ def prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df):
     # print(df)
     return df
 
-def get_frontier_type(frontier):
-    recently_emerging_counter = 0
-    persistent_emerging_counter = set()
-    current_year = datetime.datetime.now().year
-    for index, row in frontier.iterrows():
-        published_year = row["Year"]
-        persistent_emerging_counter.add(published_year)
-        if (published_year >= current_year - 3):
-            recently_emerging_counter = recently_emerging_counter + 1
-    frontier_type = None
-    if (len(frontier) < 0):
-        frontier_type = "Outlier"
-    else:
-        if ((recently_emerging_counter/len(frontier) * 100) >= 80):
-            frontier_type = "Recently Emerging Frontier"
-        elif (len(persistent_emerging_counter) > (YEAR_RANGE/2)):  #Currently hardcoded for 10 years
-            frontier_type = "Persistently Emerging Frontier"
-        else:
-            frontier_type = "Neutral Frontier"
-    
-    return frontier_type
-
-def get_frontier_stats(frontier, total_doc, max_year, min_year):
-    total_no_of_citation = frontier["Cited by Others"].sum()
-    total_no_of_entries = len(frontier.index)
-    growth = analysis.growth_index(frontier, total_doc, max_year, min_year)
-    impact = analysis.impact_index(total_no_of_citation, total_no_of_entries)
-    # sci_based = analysis.sci_based_index()
-    return growth, impact
-
-def extract_frontier(cleaned_df):
-    number_of_cluster = int(cleaned_df["Cluster"].max() + 1)
-    frontier_list = []
-    for x in range(0, number_of_cluster):
-        frontier_list.append([])
-    for index, row in cleaned_df.iterrows():
-        frontier_index = row["Cluster"]
-        if (math.isnan(frontier_index)):
-            frontier_index = int(number_of_cluster)
-        #Title, Year, Keyword, TimesCited, TimesCiting -> to add Journal and Abstract
-        publication = [row["Article Title"], row["Publication Year"], 
-                        row["Abstract"], row["Keywords"], 
-                        row["Cited Reference Count"], row["Times Cited, WoS Core"]]
-        frontier_list[int(frontier_index - 1)].append(publication)
-    
-    return frontier_list
-
-
-def create_individual_frontier_df(frontier_list):
-    frontier_count = 1
-    current_time_str = datetime.datetime.now().strftime("%d-%m-%Y-%H%M")
-    frontier_df_list = []
-    for frontier in frontier_list:
-        current_frontier_df = pd.DataFrame(frontier, columns = ['Title', 'Year', 'Abstract', 'Keywords', 'Citing Others', 
-        'Cited by Others'])
-        frontier_words = textminer.mine_paper_info(current_frontier_df)
-        frontier_name = textminer.mine_frontier_name(frontier_words)
-        frontier_df_list.append(current_frontier_df)
-        if not os.path.exists("./data/cluster/" + current_time_str + "/" + frontier_name):
-            os.makedirs("./data/cluster/" + current_time_str + "/" + frontier_name)
-        excel_path = "./data/cluster/{}/{}/{}.xlsx".format(current_time_str, frontier_name, frontier_name)
-        wordcloud_path = "./data/cluster/{}/{}/wordcloud.png".format(current_time_str, frontier_name)
-        current_frontier_df.to_excel(excel_path, index=False)
-        wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
-        frontier_count = frontier_count + 1
-    return frontier_df_list
-
-def create_frontier_summary_df(frontier_df_list, total_doc, max_year, min_year):
-    frontier_summary = []
-    count = 1
-    for frontier in frontier_df_list:
-        current_frontier = []
-        frontier_name = "HARDCODED NAME FOR NOW, SUPPOSE TO RETRIEVE FROM A DICT OR TUPLE DIRECTLY FROM FRONTIER"
-        frontier_type = get_frontier_type(frontier)
-        frontier_size = len(frontier.index)
-        # print("NEXT FRONTIER: " + str(count))
-        count = count + 1
-        frontier_growth, frontier_impact = get_frontier_stats(frontier, total_doc, max_year, min_year)
-        # print("\nFrontier Growth: " + str(frontier_growth))
-        # print("Frontier Impact: " + str(frontier_impact) + "\n")
-        current_frontier = [frontier_name, frontier_type, frontier_size, 
-                            frontier_growth, frontier_impact]
-        frontier_summary.append(current_frontier)
-
-    frontier_summary_df = pd.DataFrame(frontier_summary, columns=['Name', 'Type', 'Size', 
-                    'Growth Index', 'Impact Index'])
-
-    return frontier_summary_df 
-
 def main():
     # cluster_path = input("Please provide cluster csv filepath \n")
     fullrecord_path = input("Please provide fullrecord excel filepath \n")
@@ -176,23 +70,34 @@ def main():
     fullrecord_df = pd.read_excel(FULLRECORD_FILEPATH)
     # journal_df = pd.read_excel(JOURNAL_FILEPATH, sheet_name=JOURNAL_SHEETNAME, engine='pyxlsb')
     journal_df = pd.read_excel(FULLRECORD_FILEPATH) # Temporary, the loading of journal takes too long for testing
+    savefile_path = "./data/cluster/" + CURRENT_TIME_STRING + "/"
     cleaned_fullrecord_df = prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df)
     # cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
     max_year = MAX_YEAR
     min_year = max_year - YEAR_RANGE
     total_doc = len(cleaned_fullrecord_df.index)
-    frontier_list = extract_frontier(cleaned_fullrecord_df)
-    frontier_df_list = create_individual_frontier_df(frontier_list)
-    frontier_summary_df = create_frontier_summary_df(frontier_df_list, total_doc, max_year, min_year)
+    frontier_list = researchfrontier.extract_frontier(cleaned_fullrecord_df)
+    frontier_df_list, accumulated_linegraph_data = researchfrontier.create_individual_frontier_df(frontier_list, 
+                                                                                                    savefile_path)
+    frontier_summary_df = researchfrontier.create_frontier_summary_df(frontier_df_list, 
+                                                                        accumulated_linegraph_data, 
+                                                                        total_doc, 
+                                                                        max_year, min_year, 
+                                                                        savefile_path)
     return None
 
 
 if __name__ == "__main__":
+    CURRENT_TIME_STRING = datetime.datetime.now().strftime("%d-%m-%Y_%H%M")
     try:
         print("Citation Analysis Programme \nPress 'Ctrl C' to quit this programme")
-        while True:
-            main()
-
-    except KeyboardInterrupt:
-        print("Terminating Citation Analysis Programme")
+        main()
+        print("Extracting of data for Citation Analysis complete")
+    except Exception as e:
+        print("An error occurred: " + e)
+        mydir = "./data/cluster/{}".format(CURRENT_TIME_STRING)
+        try:
+            shutil.rmtree(mydir)
+        except OSError as e:
+            print("Error: %s - %s." % (e.filename, e.strerror))
         pass

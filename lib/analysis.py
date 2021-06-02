@@ -8,15 +8,10 @@ def growth_index(frontier, total_doc, max_year, min_year):
         up_to_previous_year = up_to_current_year - 1
         current_year_count = len(frontier[frontier["Year"] <= up_to_current_year])
         previous_year_count = len(frontier[frontier["Year"] <= up_to_previous_year])
-        # print(str(up_to_current_year) + ": " + str(current_year_count))
-        # print(str(up_to_previous_year) + ": " + str(previous_year_count))
         if (previous_year_count > 0):
             sum_of_growth = sum_of_growth + (current_year_count - previous_year_count) / previous_year_count
         else:
             break
-    
-    # print(rf_percentage)
-    # print(sum_of_growth/(data_collection_period - 1) * 100)
     growth_index = rf_percentage * (sum_of_growth / (data_collection_period - 1) * 100)
     return growth_index
 

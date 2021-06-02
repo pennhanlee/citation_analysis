@@ -24,6 +24,5 @@ def mine_paper_info(frontier):
 
 def mine_frontier_name(word_frequency):
     top_two_words = word_frequency.most_common(2)
-    print(top_two_words)
     frontier_name = " ".join([x[0] for x in top_two_words])
     return frontier_name
