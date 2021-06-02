@@ -32,7 +32,7 @@ def pdf_extraction():
     pdf_scrap_handler()
     return None
 
-def prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df):
+def prepare_fullrecord_df(fullrecord_df, cluster_df):
     df = fullrecord_df
 
     df["Keywords"] = df[['Author Keywords' , 'Keywords Plus']].fillna('').apply("; ".join, axis = 1)
@@ -65,16 +65,24 @@ def prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df):
 
 def main():
     # cluster_path = input("Please provide cluster csv filepath \n")
-    fullrecord_path = input("Please provide fullrecord excel filepath \n")
-    cluster_df = pd.read_csv(CLUSTER_FILEPATH)
-    fullrecord_df = pd.read_excel(FULLRECORD_FILEPATH)
-    # journal_df = pd.read_excel(JOURNAL_FILEPATH, sheet_name=JOURNAL_SHEETNAME, engine='pyxlsb')
-    journal_df = pd.read_excel(FULLRECORD_FILEPATH) # Temporary, the loading of journal takes too long for testing
-    savefile_path = "./data/cluster/" + CURRENT_TIME_STRING + "/"
-    cleaned_fullrecord_df = prepare_fullrecord_df(fullrecord_df, cluster_df, journal_df)
-    # cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
+    # fullrecord_path = input("Please provide fullrecord excel filepath \n")
+    # max_year = int(input("Please give the latest year for analysis Eg. 2021 \n"))
+    # min_year = int(input("Please give the earliest year for analysis Eg. 2010 \n"))
+    '''
+    HARDCODE AREA FOR EASE OF CODING
+    '''
+    cluster_path = CLUSTER_FILEPATH
+    fullrecord_path = FULLRECORD_FILEPATH
     max_year = MAX_YEAR
-    min_year = max_year - YEAR_RANGE
+    min_year = MAX_YEAR - YEAR_RANGE
+    print("Preparing provided data")
+    cluster_df = pd.read_csv(cluster_path)
+    fullrecord_df = pd.read_excel(fullrecord_path)
+    # journal_df = pd.read_excel(JOURNAL_FILEPATH, sheet_name=JOURNAL_SHEETNAME, engine='pyxlsb')
+    # journal_df = pd.read_excel(FULLRECORD_FILEPATH) # Temporary, the loading of journal takes too long for testing
+    savefile_path = "./data/cluster/" + CURRENT_TIME_STRING + "/"
+    cleaned_fullrecord_df = prepare_fullrecord_df(fullrecord_df, cluster_df)
+    # cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
     total_doc = len(cleaned_fullrecord_df.index)
     frontier_list = researchfrontier.extract_frontier(cleaned_fullrecord_df)
     frontier_df_list, accumulated_linegraph_data = researchfrontier.create_individual_frontier_df(frontier_list, 

@@ -33,7 +33,6 @@ def generate_year_linegraph(frontier, save_path):
 
 def generate_summary_linegraph(linegraph_data, save_path):
     for key in linegraph_data.keys():
-        print(key)
         plt.plot(linegraph_data[key][0], linegraph_data[key][1], label=key)
     plt.xlabel("Years")
     plt.ylabel("Culmulative Papers Published")

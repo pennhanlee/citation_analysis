@@ -40,7 +40,7 @@ def create_individual_frontier_df(frontier_list, file_path):
         wordcloud_path = file_path + "/{}/wordcloud.png".format(frontier_name)
         linegraph_path = file_path + "/{}/linegraph.png".format(frontier_name)
         current_frontier_df.to_excel(excel_path, index=False)
-        # wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
+        wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
         linegraph_data = wordcloudcreator.generate_year_linegraph(current_frontier_df, linegraph_path)
         frontier_linegraph_data[frontier_name] = linegraph_data
 
