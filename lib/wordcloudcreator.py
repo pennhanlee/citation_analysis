@@ -18,12 +18,18 @@ def generate_word_cloud(list_of_words, save_path):
     return None
 
 
-def generate_year_linegraph(frontier, save_path):
+def generate_year_linegraph(frontier, save_path, max_year, min_year):
     frontier = frontier["Year"].value_counts().sort_index(ascending=True)
-    for x in range(1, len(frontier.values)):
-        frontier.values[x] = frontier.values[x] + frontier.values[x-1]
+    year_range = [x for x in range(min_year, max_year + 1)]
+    papers_published = []
+    print(year_range)
+    counter = 0
+    for x in range(0, (max_year - min_year + 1)):
+        if float(year_range[x]) in frontier.index:
+            counter = counter + frontier[year_range[x]]
+        papers_published.append(counter)
 
-    plt.plot(frontier.index, frontier.values, color="red", marker="o")
+    plt.plot(year_range, papers_published, color="red", marker="o")
     plt.xlabel("Years")
     plt.ylabel("Culmulative Papers Published")
     plt.grid(True)

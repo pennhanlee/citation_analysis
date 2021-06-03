@@ -25,28 +25,22 @@ def extract_frontier(cleaned_df):
     
     return frontier_list
 
-def create_individual_frontier_df(frontier_list, file_path):
+def create_individual_frontier_df(df, name, file_path, max_year, min_year, frontier_words):
     frontier_df_list = []
     frontier_linegraph_data = {}
-    for frontier in frontier_list:
-        current_frontier_df = pd.DataFrame(frontier, columns = ['Title', 'Year', 'Abstract', 'Keywords', 'Citing Others', 
-        'Cited by Others'])
-        frontier_words = textminer.mine_paper_info(current_frontier_df)
-        frontier_name = textminer.mine_frontier_name(frontier_words)
-        frontier_df_list.append((frontier_name, current_frontier_df))
-        if not os.path.exists(file_path + frontier_name):
-            os.makedirs(file_path + frontier_name)
-        excel_path = file_path + "/{}/{}.xlsx".format(frontier_name, frontier_name)
-        wordcloud_path = file_path + "/{}/wordcloud.png".format(frontier_name)
-        linegraph_path = file_path + "/{}/linegraph.png".format(frontier_name)
-        current_frontier_df.to_excel(excel_path, index=False)
-        wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
-        linegraph_data = wordcloudcreator.generate_year_linegraph(current_frontier_df, linegraph_path)
-        frontier_linegraph_data[frontier_name] = linegraph_data
+    if not os.path.exists(file_path + name):
+        os.makedirs(file_path + name)
+    excel_path = file_path + "/{}/{}.xlsx".format(name, name)
+    wordcloud_path = file_path + "/{}/wordcloud.png".format(name)
+    linegraph_path = file_path + "/{}/linegraph.png".format(name)
+    df.to_excel(excel_path, index=False)
+    wordcloudcreator.generate_word_cloud(frontier_words, wordcloud_path)
+    linegraph_data = wordcloudcreator.generate_year_linegraph(df, linegraph_path, max_year, min_year)
+    frontier_linegraph_data[name] = linegraph_data
 
     return frontier_df_list, frontier_linegraph_data
 
-def create_frontier_summary_df(frontier_df_list, linegraph_data, total_doc, max_year, min_year, file_path):
+def create_frontier_summary_df(frontier_df_list, file_path, linegraph_data, total_doc, max_year, min_year):
     frontier_summary = []
     count = 1
     year_range = max_year - min_year

@@ -13,8 +13,10 @@ import lib.wordcloudcreator as wordcloudcreator
 import lib.researchfrontier as researchfrontier
 
 #Temporary URl Hardcode
-CLUSTER_FILEPATH = "./data/cluster/vosviewer_graph_1_500.csv"
-FULLRECORD_FILEPATH = "./data/cluster/computervision_fullrec_nocr.xls"
+# CLUSTER_FILEPATH = "./data/cluster/vosviewer_graph_1_500.csv"
+# FULLRECORD_FILEPATH = "./data/cluster/computervision_fullrec_nocr.xls"
+CLUSTER_FILEPATH = "./data/datafiles/computervision2010_2020/vos_map.csv"
+FULLRECORD_FILEPATH = "./data/datafiles/computervision2010_2020/excelversion/4.xls"
 JOURNAL_FILEPATH = "./data/cluster/CiteScore_2011_2019.xlsb"
 JOURNAL_SHEETNAME = "CiteScore 2019"
 MAX_YEAR = 2021
@@ -85,27 +87,58 @@ def main():
     # cleaned_fullrecord_df.to_excel("./data/cluster/cleaned.xlsx", index=False)
     total_doc = len(cleaned_fullrecord_df.index)
     frontier_list = researchfrontier.extract_frontier(cleaned_fullrecord_df)
-    frontier_df_list, accumulated_linegraph_data = researchfrontier.create_individual_frontier_df(frontier_list, 
-                                                                                                    savefile_path)
-    frontier_summary_df = researchfrontier.create_frontier_summary_df(frontier_df_list, 
+    frontier_summary_list = []
+    frontier_tuple_list = []
+    frontier_linegraph_data = {}
+    word_bank = {}
+    total_word_count = 0
+    accumulated_linegraph_data = {}
+    if not os.path.exists(savefile_path):
+        os.makedirs(savefile_path)
+    for frontier in frontier_list:
+        current_frontier_df = pd.DataFrame(frontier, columns = ['Title', 'Year', 'Abstract', 'Keywords', 'Citing Others', 
+        'Cited by Others'])
+        frontier_summary_list.append(current_frontier_df)
+        no_of_words, word_freq, frontier_word_list = textminer.mine_paper_info(current_frontier_df)
+        total_word_count = total_word_count + no_of_words
+        for word in word_freq:
+            if word in word_bank:
+                word_bank[word[0]] += word[1]
+            else:
+                word_bank[word[0]] = word[1]
+
+    for frontier_df in frontier_summary_list:
+        list_of_words, frontier_name = textminer.mine_frontier(frontier_df, word_bank, total_doc)
+        linegraph_data = researchfrontier.create_individual_frontier_df(current_frontier_df, 
+                                                                        frontier_name, 
+                                                                        savefile_path,  
+                                                                        max_year, 
+                                                                        min_year, 
+                                                                        list_of_words)
+        frontier_tuple_list.append((frontier_name, frontier_df))
+        frontier_linegraph_data[frontier_name] = linegraph_data
+
+    frontier_summary_df = researchfrontier.create_frontier_summary_df(frontier_tuple_list,
+                                                                        savefile_path,  
                                                                         accumulated_linegraph_data, 
                                                                         total_doc, 
-                                                                        max_year, min_year, 
-                                                                        savefile_path)
+                                                                        max_year, 
+                                                                        min_year)
     return None
 
 
 if __name__ == "__main__":
     CURRENT_TIME_STRING = datetime.datetime.now().strftime("%d-%m-%Y_%H%M")
-    try:
-        print("Citation Analysis Programme \nPress 'Ctrl C' to quit this programme")
-        main()
-        print("Extracting of data for Citation Analysis complete")
-    except Exception as e:
-        print("An error occurred: " + e)
-        mydir = "./data/cluster/{}".format(CURRENT_TIME_STRING)
-        try:
-            shutil.rmtree(mydir)
-        except OSError as e:
-            print("Error: %s - %s." % (e.filename, e.strerror))
-        pass
+    # try:
+    #     print("Citation Analysis Programme \nPress 'Ctrl C' to quit this programme")
+    #     main()
+    #     print("Extracting of data for Citation Analysis complete")
+    # except Exception as e:
+    #     print(e)
+    #     mydir = "./data/cluster/{}".format(CURRENT_TIME_STRING)
+    #     try:
+    #         shutil.rmtree(mydir)
+    #     except OSError as e:
+    #         print("Error: %s - %s." % (e.filename, e.strerror))
+    #     pass
+    main()
