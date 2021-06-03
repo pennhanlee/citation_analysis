@@ -89,7 +89,6 @@ def main():
     frontier_list = researchfrontier.extract_frontier(cleaned_fullrecord_df)
     frontier_summary_list = []
     frontier_tuple_list = []
-    frontier_linegraph_data = {}
     word_bank = {}
     total_word_count = 0
     accumulated_linegraph_data = {}
@@ -109,14 +108,14 @@ def main():
 
     for frontier_df in frontier_summary_list:
         list_of_words, frontier_name = textminer.mine_frontier(frontier_df, word_bank, total_doc)
-        linegraph_data = researchfrontier.create_individual_frontier_df(current_frontier_df, 
+        linegraph_data = researchfrontier.create_individual_frontier_df(frontier_df, 
                                                                         frontier_name, 
                                                                         savefile_path,  
                                                                         max_year, 
                                                                         min_year, 
                                                                         list_of_words)
         frontier_tuple_list.append((frontier_name, frontier_df))
-        frontier_linegraph_data[frontier_name] = linegraph_data
+        accumulated_linegraph_data[frontier_name] = linegraph_data
 
     frontier_summary_df = researchfrontier.create_frontier_summary_df(frontier_tuple_list,
                                                                         savefile_path,  

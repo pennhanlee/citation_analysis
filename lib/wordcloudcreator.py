@@ -22,7 +22,6 @@ def generate_year_linegraph(frontier, save_path, max_year, min_year):
     frontier = frontier["Year"].value_counts().sort_index(ascending=True)
     year_range = [x for x in range(min_year, max_year + 1)]
     papers_published = []
-    print(year_range)
     counter = 0
     for x in range(0, (max_year - min_year + 1)):
         if float(year_range[x]) in frontier.index:
@@ -35,7 +34,7 @@ def generate_year_linegraph(frontier, save_path, max_year, min_year):
     plt.grid(True)
     plt.savefig(save_path)
     plt.close()
-    return (frontier.index, frontier.values)
+    return (year_range, papers_published)
 
 def generate_summary_linegraph(linegraph_data, save_path):
     for key in linegraph_data.keys():
